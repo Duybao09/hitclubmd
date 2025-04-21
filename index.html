@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DUY BẢO TOOL V15.6 - TÀI XỈU</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <style>
+    body {
+      background: black;
+      color: lime;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+    }
+    input, button {
+      padding: 12px;
+      font-size: 16px;
+      margin: 10px 8px;
+      border-radius: 8px;
+      border: none;
+      width: 90%;
+      max-width: 400px;
+    }
+    button {
+      background: lime;
+      color: black;
+      font-weight: bold;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 22px;
+      color: yellow;
+    }
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- XÁC THỰC -->
+<div id="authBox">
+  <h2>XÁC THỰC</h2>
+  <input id="email" type="email" placeholder="Gmail được cấp">
+  <input id="key" type="text" placeholder="Key được cấp">
+  <button onclick="kiemTraKey()">TIẾP TỤC</button>
+  <div id="authMsg" style="color: orange;"></div>
+</div>
+
+<!-- TOOL CHÍNH -->
+<div id="mainBox" class="hidden">
+  <h2>DUY BẢO TOOL V15.6 - DỰ ĐOÁN TÀI XỈU</h2>
+
+  <input id="md5Input" placeholder="Nhập mã MD5..." />
+  <button onclick="phanTich()">PHÂN TÍCH</button>
+
+  <div id="result">KẾT QUẢ: </div>
+
+  <input id="ketquaThucTe" placeholder="Nhập kết quả thật (TÀI/XỈU)" />
+  <button onclick="luuLog()">LƯU KẾT QUẢ</button>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyDV-WnnRBzNGaJjCmJMY7NOWEPFioHOioU",
+    authDomain: "duybao-v11.firebaseapp.com",
+    databaseURL: "https://duybao-v11-default-rtdb.firebaseio.com",
+    projectId: "duybao-v11",
+    storageBucket: "duybao-v11.appspot.com",
+    messagingSenderId: "637858629893",
+    appId: "1:637858629893:web:ad4d6de4f0f191b22b4f6c"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
+
+  let currentUser = "", currentKey = "", currentMD5 = "", currentDuDoan = "";
+
+  async function kiemTraKey() {
+    const email = document.getElementById("email").value.trim();
+    const key = document.getElementById("key").value.trim();
+    const msg = document.getElementById("authMsg");
+
+    if (!email || !key) {
+      msg.innerText = "Vui lòng nhập Gmail và key!";
+      return;
+    }
+
+    const snap = await db.ref("keys/" + key).get();
+    const data = snap.val();
+
+    if (!data || data.email !== email) {
+      msg.innerText = "Sai Gmail hoặc key!";
+      return;
+    }
+
+    const today = new Date().toISOString().split("T")[0];
+    if (data.expire < today || data.used >= data.maxUse) {
+      msg.innerText = "Key hết hạn hoặc vượt lượt!";
+      return;
+    }
+
+    await db.ref("keys/" + key + "/used").set(data.used + 1);
+    currentUser = email;
+    currentKey = key;
+
+    document.getElementById("authBox").classList.add("hidden");
+    document.getElementById("mainBox").classList.remove("hidden");
+  }
+
+  function phanTich() {
+    const md5 = document.getElementById("md5Input").value.trim().toLowerCase();
+    const res = document.getElementById("result");
+
+    if (!md5 || md5.length < 32) {
+      res.textContent = "Vui lòng nhập mã MD5 hợp lệ!";
+      return;
+    }
+
+    currentMD5 = md5;
+
+    // Thuật toán nâng cấp: dùng byte 0, 2, 4, 6
+    const b = [0, 2, 4, 6].map(i => parseInt(md5.slice(i, i+2), 16));
+    const total = b.reduce((a, b) => a + b, 0);
+    const ketqua = total % 2 === 0 ? "XỈU" : "TÀI";
+
+    currentDuDoan = ketqua;
+    res.textContent = "DỰ ĐOÁN: " + ketqua;
+  }
+
+  function luuLog() {
+    const thucTe = document.getElementById("ketquaThucTe").value.trim().toUpperCase();
+    if (!thucTe || !currentDuDoan) {
+      alert("Vui lòng nhập kết quả thật và phân tích trước!");
+      return;
+    }
+
+    const ketQua = thucTe === currentDuDoan ? "ĐÚNG" : "SAI";
+
+    db.ref("log_ai").push({
+      email: currentUser,
+      key: currentKey,
+      md5: currentMD5,
+      duDoan: currentDuDoan,
+      ketQuaThucTe: thucTe,
+      ketQua,
+      time: new Date().toLocaleString()
+    });
+
+    alert("Đã lưu kết quả để AI học tiếp.");
+  }
+</script>
+
+</body>
+</html>
